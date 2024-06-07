@@ -37,6 +37,7 @@ async function run() {
         // await client.connect();
 
         const studyCollection = client.db("studyBuddyDB").collection("study");
+        const tutorCollection = client.db("studyBuddyDB").collection("tutor");
 
         //study api
         app.get('/study', async (req, res) => {
@@ -44,10 +45,18 @@ async function run() {
             res.send(result)
         })
 
+        
         app.get('/study/:id', async (req, res) => {
             const id = req.params.id;
+            console.log(id)
             const query = { _id: new ObjectId(id) }
             const result = await studyCollection.findOne(query);
+            res.send(result)
+        })
+
+         //tutor api
+         app.get('/tutor', async (req, res) => {
+            const result = await tutorCollection.find().toArray();
             res.send(result)
         })
 
