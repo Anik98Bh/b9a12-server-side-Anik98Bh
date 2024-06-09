@@ -83,6 +83,14 @@ async function run() {
             res.send(result)
         })
 
+         //materials api
+         app.post('/create-materials', async (req, res) => {
+            const materials = req.body;
+            console.log(session);
+            const result = await materialsCollection.insertOne(materials);
+            res.send(result)
+        })
+
         // Send a ping to confirm a successful connection
         // await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
