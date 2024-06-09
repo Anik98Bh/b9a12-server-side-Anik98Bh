@@ -8,13 +8,7 @@ const port = process.env.PORT || 5000;
 
 //middleware
 app.use(
-    cors({
-        origin: [
-            "http://localhost:5173",
-            // "https://cardoctor-bd.web.app",
-            // "https://cardoctor-bd.firebaseapp.com",
-        ]
-    })
+    cors()
 );
 app.use(express.json());
 
@@ -38,6 +32,7 @@ async function run() {
 
         const studyCollection = client.db("studyBuddyDB").collection("study");
         const tutorCollection = client.db("studyBuddyDB").collection("tutor");
+        const sessionCollection = client.db("studyBuddyDB").collection("session");
 
         //study api
         app.get('/study', async (req, res) => {
@@ -45,7 +40,7 @@ async function run() {
             res.send(result)
         })
 
-        
+
         app.get('/study/:id', async (req, res) => {
             const id = req.params.id;
             console.log(id)
@@ -54,9 +49,29 @@ async function run() {
             res.send(result)
         })
 
-         //tutor api
-         app.get('/tutor', async (req, res) => {
+        //tutor api
+        app.get('/tutor', async (req, res) => {
             const result = await tutorCollection.find().toArray();
+            res.send(result)
+        })
+
+        //session api
+        app.post('/create-session', async (req, res) => {
+            const session = req.body;
+            console.log(session);
+            const result = await sessionCollection.insertOne(session);
+            res.send(result)
+        })
+
+        app.get('/all-session', async (req, res) => {
+            const result = await sessionCollection.find().toArray();
+            res.send(result)
+        })
+
+        app.get('/all-session/:email', async (req, res) => {
+            const query=req.params?.email;
+            console.log(query)
+            const result = await sessionCollection.find({email:query}).toArray();
             res.send(result)
         })
 
