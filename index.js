@@ -33,6 +33,7 @@ async function run() {
         const studyCollection = client.db("studyBuddyDB").collection("study");
         const tutorCollection = client.db("studyBuddyDB").collection("tutor");
         const sessionCollection = client.db("studyBuddyDB").collection("session");
+        const materialsCollection = client.db("studyBuddyDB").collection("materials");
 
         //study api
         app.get('/study', async (req, res) => {
@@ -72,6 +73,13 @@ async function run() {
             const query=req.params?.email;
             console.log(query)
             const result = await sessionCollection.find({email:query}).toArray();
+            res.send(result)
+        })
+
+        app.get('/all-approved-session/:email', async (req, res) => {
+            const query=req.params?.email;
+            console.log(query)
+            const result = await sessionCollection.find({email:query,status:"approved"}).toArray();
             res.send(result)
         })
 
