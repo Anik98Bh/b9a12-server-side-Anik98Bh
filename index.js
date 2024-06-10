@@ -42,6 +42,22 @@ async function run() {
             res.send({ token })
         })
 
+        //middlewares
+        const verifyToken = (req, res, next) => {
+            console.log('inside verify token', req.headers.authorization);
+            if (!req.headers?.authorization) {
+                return res.status(401).send({ message: 'unauthorized access' })
+            }
+            const token = req.headers.authorization.split(' ')[1];
+            jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+                if (err) {
+                    return res.status(401).send({ message: 'unauthorized access' })
+                }
+                req.decoded = decoded;
+                next();
+            })
+        }
+
         //study api
         app.get('/study', async (req, res) => {
             const result = await studyCollection.find().toArray();
@@ -77,21 +93,21 @@ async function run() {
         })
 
         app.get('/all-session/:email', async (req, res) => {
-            const query=req.params?.email;
+            const query = req.params?.email;
             console.log(query)
-            const result = await sessionCollection.find({email:query}).toArray();
+            const result = await sessionCollection.find({ email: query }).toArray();
             res.send(result)
         })
 
         app.get('/all-approved-session/:email', async (req, res) => {
-            const query=req.params?.email;
+            const query = req.params?.email;
             console.log(query)
-            const result = await sessionCollection.find({email:query,status:"approved"}).toArray();
+            const result = await sessionCollection.find({ email: query, status: "approved" }).toArray();
             res.send(result)
         })
 
-         //materials api
-         app.post('/create-materials', async (req, res) => {
+        //materials api
+        app.post('/create-materials', async (req, res) => {
             const materials = req.body;
             console.log(session);
             const result = await materialsCollection.insertOne(materials);
