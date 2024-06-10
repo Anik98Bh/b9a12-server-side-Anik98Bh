@@ -30,6 +30,7 @@ async function run() {
         // Connect the client to the server	(optional starting in v4.7)
         // await client.connect();
 
+        const usersCollection = client.db("studyBuddyDB").collection("users");
         const studyCollection = client.db("studyBuddyDB").collection("study");
         const tutorCollection = client.db("studyBuddyDB").collection("tutor");
         const sessionCollection = client.db("studyBuddyDB").collection("session");
@@ -57,6 +58,18 @@ async function run() {
                 next();
             })
         }
+
+        //user api
+        app.get('/users', async (req, res) => {
+            const result = await usersCollection.find().toArray();
+            res.send(result)
+        })
+
+        app.post('/users', async (req, res) => {
+            const user = req.body;
+            const result = await usersCollection.insertOne(user)
+            res.send(result)
+        })
 
         //study api
         app.get('/study', async (req, res) => {
