@@ -35,6 +35,7 @@ async function run() {
         const studyCollection = client.db("studyBuddyDB").collection("study");
         const tutorCollection = client.db("studyBuddyDB").collection("tutor");
         const sessionCollection = client.db("studyBuddyDB").collection("session");
+        const notesCollection = client.db("studyBuddyDB").collection("notes");
         const materialsCollection = client.db("studyBuddyDB").collection("materials");
         const paymentsCollection = client.db("studyBuddyDB").collection("payments");
 
@@ -61,6 +62,18 @@ async function run() {
             })
         }
 
+         //use verify admin after verifyToken
+         const verifyAdmin = async (req, res, next) => {
+            const email = req.decoded.email;
+            const query = { email: email };
+            const user = await usersCollection.findOne(query);
+            const isAdmin = user?.role === 'admin';
+            if (!isAdmin) {
+                return res.status(403).send({ message: 'forbidden access' })
+            }
+            next();
+        }
+
         //user api
         app.get('/users', async (req, res) => {
             const result = await usersCollection.find().toArray();
@@ -70,6 +83,13 @@ async function run() {
         app.post('/users', async (req, res) => {
             const user = req.body;
             const result = await usersCollection.insertOne(user)
+            res.send(result)
+        })
+
+        //review api
+        app.post('/create-review', async (req, res) => {
+            const review = req.body;
+            const result = await reviewsCollection.insertOne(review)
             res.send(result)
         })
 
