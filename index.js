@@ -62,9 +62,9 @@ async function run() {
             })
         }
 
-         //use verify admin after verifyToken
-         const verifyAdmin = async (req, res, next) => {
-            const email = req.decoded.email;
+        //use verify admin after verifyToken
+        const verifyAdmin = async (req, res, next) => {
+            const email = req.decoded?.email;
             const query = { email: email };
             const user = await usersCollection.findOne(query);
             const isAdmin = user?.role === 'admin';
@@ -74,19 +74,88 @@ async function run() {
             next();
         }
 
+        //use verify tutor after verifyToken
+        const verifyTutor = async (req, res, next) => {
+            const email = req.decoded?.email;
+            const query = { email: email };
+            const user = await usersCollection.findOne(query);
+            const isTutor = user?.role === 'tutor';
+            if (!isTutor) {
+                return res.status(403).send({ message: 'forbidden access' })
+            }
+            next();
+        }
+
         //user api
-        app.get('/users', async (req, res) => {
+        app.get('/users', verifyToken, async (req, res) => {
             const result = await usersCollection.find().toArray();
             res.send(result)
         })
 
+        app.get('/users/admin/:email', verifyToken, async (req, res) => {
+            const email = req.params?.email;
+            if (email !== req.decoded?.email) {
+                return res.status(403).send({ message: 'forbidden access' })
+            }
+            const query = { email: email };
+            const user = await usersCollection.findOne(query);
+            let admin = false;
+            if (user) {
+                admin = user?.role === 'admin';
+            }
+            res.send({ admin })
+        })
+
+        app.get('/users/tutor/:email', verifyToken, async (req, res) => {
+            const email = req.params?.email;
+            if (email !== req.decoded?.email) {
+                return res.status(403).send({ message: 'forbidden access' })
+            }
+            const query = { email: email };
+            const user = await usersCollection.findOne(query);
+            let tutor = false;
+            if (user) {
+                tutor = user?.role === 'tutor';
+            }
+            res.send({ tutor })
+        })
+
         app.post('/users', async (req, res) => {
             const user = req.body;
-            const result = await usersCollection.insertOne(user)
+            const query = { email: user.email };
+            const existingUser = await usersCollection.findOne(query)
+            if (existingUser) {
+                return res.send({ message: ' user already exists', insertedId: null })
+            }
+            const result = await usersCollection.insertOne(user);
             res.send(result)
         })
 
-        //review api
+        app.patch('/users/admin/:id', verifyToken, verifyAdmin, async (req, res) => {
+            const id = req.params?.id;
+            const filter = { _id: new ObjectId(id) };
+            const updatedDoc = {
+                $set: {
+                    role: 'admin'
+                }
+            }
+            const result = await usersCollection.updateOne(filter, updatedDoc);
+            res.send(result)
+        })
+
+        app.patch('/users/tutor/:id', verifyToken, async (req, res) => {
+            const id = req.params?.id;
+            const filter = { _id: new ObjectId(id) };
+            const updatedDoc = {
+                $set: {
+                    role: 'tutor'
+                }
+            }
+            const result = await usersCollection.updateOne(filter, updatedDoc);
+            res.send(result)
+        })
+
+        //reviews api
         app.post('/create-review', async (req, res) => {
             const review = req.body;
             const result = await reviewsCollection.insertOne(review)
@@ -149,8 +218,22 @@ async function run() {
             res.send(result)
         })
 
-          // payment intent
-          app.post('/create-payment-intent', async (req, res) => {
+        //student notes api
+        app.get('/notes/:email', async (req, res) => {
+            const query = req.params?.email;
+            console.log(query)
+            const result = await notesCollection.find({ email: query }).toArray();
+            res.send(result)
+        })
+
+        app.post('/create-note', async (req, res) => {
+            const note = req.body;
+            const result = await notesCollection.insertOne(note)
+            res.send(result)
+        })
+
+        // payment intent api
+        app.post('/create-payment-intent', async (req, res) => {
             const { price } = req.body;
             const amount = parseInt(price * 100);
             console.log(amount, 'amount inside the intent')
