@@ -37,7 +37,7 @@ async function run() {
         const sessionCollection = client.db("studyBuddyDB").collection("session");
         const notesCollection = client.db("studyBuddyDB").collection("notes");
         const materialsCollection = client.db("studyBuddyDB").collection("materials");
-        const paymentsCollection = client.db("studyBuddyDB").collection("payments");
+        const bookedCollection = client.db("studyBuddyDB").collection("booked");
 
         // jwt related api
         app.post('/jwt', async (req, res) => {
@@ -143,7 +143,7 @@ async function run() {
             res.send(result)
         })
 
-        app.patch('/users/tutor/:id', verifyToken, async (req, res) => {
+        app.patch('/users/tutor/:id', verifyToken,verifyAdmin, async (req, res) => {
             const id = req.params?.id;
             const filter = { _id: new ObjectId(id) };
             const updatedDoc = {
@@ -155,7 +155,30 @@ async function run() {
             res.send(result)
         })
 
+        // admin related api
+        app.delete('/rejected-study-session/:id', async (req, res) => {
+            const id = req.params.id;
+            console.log('deleted material id:', id)
+            const query = { _id: new ObjectId(id) }
+            // const result = await materialsCollection.deleteOne(query);
+            // res.send(result)
+        })
+        
+        app.delete('/remove-materials/:id', async (req, res) => {
+            const id = req.params.id;
+            console.log('deleted material id:', id)
+            const query = { _id: new ObjectId(id) }
+            // const result = await materialsCollection.deleteOne(query);
+            // res.send(result)
+        })
+
         //reviews api
+        app.get('/reviews/:id',verifyToken, async (req, res) => {
+            const query = req.params.id
+            const result = await reviewsCollection.find({ id: query }).toArray();
+            res.send(result)
+        })
+
         app.post('/create-review', async (req, res) => {
             const review = req.body;
             const result = await reviewsCollection.insertOne(review)
@@ -168,7 +191,6 @@ async function run() {
             res.send(result)
         })
 
-
         app.get('/study/:id', async (req, res) => {
             const id = req.params.id;
             console.log(id)
@@ -179,7 +201,8 @@ async function run() {
 
         //tutor api
         app.get('/tutor', async (req, res) => {
-            const result = await tutorCollection.find().toArray();
+            const query = "tutor"
+            const result = await usersCollection.find({ role: query }).toArray();
             res.send(result)
         })
 
@@ -211,10 +234,25 @@ async function run() {
         })
 
         //materials api
+        app.get('/materials/:email', async (req, res) => {
+            const query = req.params?.email;
+            console.log(query)
+            const result = await materialsCollection.find({ email: query }).toArray();
+            res.send(result)
+        })
+
         app.post('/create-materials', async (req, res) => {
             const materials = req.body;
-            console.log(session);
+            console.log(materials);
             const result = await materialsCollection.insertOne(materials);
+            res.send(result)
+        })
+
+        app.delete('/materials/:id', async (req, res) => {
+            const id = req.params.id;
+            console.log('deleted material id:', id)
+            const query = { _id: new ObjectId(id) }
+            const result = await materialsCollection.deleteOne(query);
             res.send(result)
         })
 
@@ -232,6 +270,29 @@ async function run() {
             res.send(result)
         })
 
+        app.patch('/update-note/:id', async (req, res) => {
+            const id = req.params.id;
+            const title = req.body.title;
+            const description = req.body.description;
+            const filter = { _id: new ObjectId(id) };
+            const updatedDoc = {
+                $set: {
+                    title: title,
+                    description: description,
+                }
+            }
+            const result = await notesCollection.updateOne(filter, updatedDoc);
+            res.send(result)
+        })
+
+        app.delete('/notes/:id', async (req, res) => {
+            const id = req.params.id;
+            console.log(id);
+            const query = { _id: new ObjectId(id) }
+            const result = await notesCollection.deleteOne(query);
+            res.send(result)
+        })
+
         // payment intent api
         app.post('/create-payment-intent', async (req, res) => {
             const { price } = req.body;
@@ -246,6 +307,13 @@ async function run() {
             res.send({
                 clientSecret: paymentIntent.client_secret
             })
+        })
+
+        // booked api
+        app.post('/book-session', async (req, res) => {
+            const booked = req.body;
+            const result = await bookedCollection.insertOne(booked)
+            res.send(result)
         })
 
         // Send a ping to confirm a successful connection
