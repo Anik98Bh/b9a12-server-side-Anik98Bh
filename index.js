@@ -32,12 +32,11 @@ async function run() {
 
         const usersCollection = client.db("studyBuddyDB").collection("users");
         const reviewsCollection = client.db("studyBuddyDB").collection("reviews");
-        const studyCollection = client.db("studyBuddyDB").collection("study");
-        const tutorCollection = client.db("studyBuddyDB").collection("tutor");
         const sessionCollection = client.db("studyBuddyDB").collection("session");
         const notesCollection = client.db("studyBuddyDB").collection("notes");
         const materialsCollection = client.db("studyBuddyDB").collection("materials");
         const bookedCollection = client.db("studyBuddyDB").collection("booked");
+        const feedbacksCollection = client.db("studyBuddyDB").collection("feedbacks");
 
         // jwt related api
         app.post('/jwt', async (req, res) => {
@@ -48,7 +47,6 @@ async function run() {
 
         //middlewares
         const verifyToken = (req, res, next) => {
-            console.log('inside verify token', req.headers.authorization);
             if (!req.headers?.authorization) {
                 return res.status(401).send({ message: 'unauthorized access' })
             }
@@ -86,11 +84,30 @@ async function run() {
             next();
         }
 
-        //user api
+
         app.get('/users', verifyToken, async (req, res) => {
-            const result = await usersCollection.find().toArray();
-            res.send(result)
-        })
+            const { search } = req.query;
+          
+            try {
+              let query = {};
+              if (search) {
+                const searchRegex = new RegExp(search, 'i');
+                query = {
+                  $or: [
+                    { name: searchRegex },
+                    { email: searchRegex }
+                  ]
+                };
+              }
+          
+              const result = await usersCollection.find(query).toArray();
+          
+              res.send(result);
+            } catch (error) {
+              console.error('Error searching users:', error);
+              res.status(500).json({ error: 'Internal server error' });
+            }
+          });
 
         app.get('/users/admin/:email', verifyToken, async (req, res) => {
             const email = req.params?.email;
@@ -143,7 +160,7 @@ async function run() {
             res.send(result)
         })
 
-        app.patch('/users/tutor/:id', verifyToken,verifyAdmin, async (req, res) => {
+        app.patch('/users/tutor/:id', verifyToken, verifyAdmin, async (req, res) => {
             const id = req.params?.id;
             const filter = { _id: new ObjectId(id) };
             const updatedDoc = {
@@ -155,25 +172,8 @@ async function run() {
             res.send(result)
         })
 
-        // admin related api
-        app.delete('/rejected-study-session/:id', async (req, res) => {
-            const id = req.params.id;
-            console.log('deleted material id:', id)
-            const query = { _id: new ObjectId(id) }
-            // const result = await materialsCollection.deleteOne(query);
-            // res.send(result)
-        })
-        
-        app.delete('/remove-materials/:id', async (req, res) => {
-            const id = req.params.id;
-            console.log('deleted material id:', id)
-            const query = { _id: new ObjectId(id) }
-            // const result = await materialsCollection.deleteOne(query);
-            // res.send(result)
-        })
-
         //reviews api
-        app.get('/reviews/:id',verifyToken, async (req, res) => {
+        app.get('/reviews/:id', verifyToken, async (req, res) => {
             const query = req.params.id
             const result = await reviewsCollection.find({ id: query }).toArray();
             res.send(result)
@@ -182,20 +182,6 @@ async function run() {
         app.post('/create-review', async (req, res) => {
             const review = req.body;
             const result = await reviewsCollection.insertOne(review)
-            res.send(result)
-        })
-
-        //study api
-        app.get('/study', async (req, res) => {
-            const result = await studyCollection.find().toArray();
-            res.send(result)
-        })
-
-        app.get('/study/:id', async (req, res) => {
-            const id = req.params.id;
-            console.log(id)
-            const query = { _id: new ObjectId(id) }
-            const result = await studyCollection.findOne(query);
             res.send(result)
         })
 
@@ -209,8 +195,13 @@ async function run() {
         //session api
         app.post('/create-session', async (req, res) => {
             const session = req.body;
-            console.log(session);
             const result = await sessionCollection.insertOne(session);
+            res.send(result)
+        })
+
+        app.get('/all-session/:email', async (req, res) => {
+            const query = req.params?.email;
+            const result = await sessionCollection.find({ tutorEmail: query }).toArray();
             res.send(result)
         })
 
@@ -219,38 +210,122 @@ async function run() {
             res.send(result)
         })
 
-        app.get('/all-session/:email', async (req, res) => {
-            const query = req.params?.email;
-            console.log(query)
-            const result = await sessionCollection.find({ email: query }).toArray();
+        //all-session pagination api
+        app.get('/all-approved-session', async (req, res) => {
+            const page = parseInt(req.query.page) || 1;
+            const limit = parseInt(req.query.limit) || 6;
+        
+            try {
+                const totalItems = await sessionCollection.countDocuments({ status: "approved" });
+                const totalPages = Math.ceil(totalItems / limit);
+        
+                if (page < 1 || page > totalPages) {
+                    return res.status(400).send({ message: 'Invalid page number' });
+                }
+        
+                const skip = (page - 1) * limit;
+        
+                const items = await sessionCollection.find({ status: "approved" })
+                    .skip(skip)
+                    .limit(limit)
+                    .toArray();
+        
+                res.send({
+                    page,
+                    limit,
+                    totalItems,
+                    totalPages,
+                    items
+                });
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                res.status(500).send({ message: 'Internal Server Error' });
+            }
+        });
+
+        app.get('/all-study-session/:id', async (req, res) => {
+            const id = req.params.id;
+            console.log(id, 'id find')
+            const query = { _id: new ObjectId(id) }
+            const result = await sessionCollection.findOne(query);
+            res.send(result)
+        })
+
+        app.patch('/update-session/:id', async (req, res) => {
+            const id = req.params.id;
+            const fee = req.body?.fee;
+            const status = req.body?.status;
+            const filter = { _id: new ObjectId(id) };
+            const updatedDoc = {
+                $set: {
+                    fee: fee,
+                    status: status
+                }
+            }
+            const result = await sessionCollection.updateOne(filter, updatedDoc);
+            res.send(result)
+        })
+
+        app.delete('/delete-session/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) }
+            const result = await sessionCollection.deleteOne(query);
             res.send(result)
         })
 
         app.get('/all-approved-session/:email', async (req, res) => {
             const query = req.params?.email;
-            console.log(query)
-            const result = await sessionCollection.find({ email: query, status: "approved" }).toArray();
+            const result = await sessionCollection.find({ tutorEmail: query, status: "approved" }).toArray();
+            res.send(result)
+        })
+
+        // rejection & feedback api
+        app.get('/rejection-feedback/:id', async (req, res) => {
+            const result = await feedbacksCollection.find().toArray();
+            res.send(result)
+        })
+
+        app.post('/create-feedback', async (req, res) => {
+            const feedback = req.body;
+            const result = await feedbacksCollection.insertOne(feedback);
             res.send(result)
         })
 
         //materials api
+        app.get('/materials', async (req, res) => {
+            const result = await materialsCollection.find().toArray();
+            res.send(result)
+        })
+
         app.get('/materials/:email', async (req, res) => {
             const query = req.params?.email;
-            console.log(query)
             const result = await materialsCollection.find({ email: query }).toArray();
             res.send(result)
         })
 
         app.post('/create-materials', async (req, res) => {
             const materials = req.body;
-            console.log(materials);
             const result = await materialsCollection.insertOne(materials);
             res.send(result)
         })
 
-        app.delete('/materials/:id', async (req, res) => {
+        app.patch('/update-materials/:id', async (req, res) => {
             const id = req.params.id;
-            console.log('deleted material id:', id)
+            const image = req.body?.image;
+            const url = req.body?.url;
+            const filter = { _id: new ObjectId(id) };
+            const updatedDoc = {
+                $set: {
+                    image: image,
+                    url: url
+                }
+            }
+            const result = await materialsCollection.updateOne(filter, updatedDoc);
+            res.send(result)
+        })
+
+        app.delete('/delete-materials/:id', async (req, res) => {
+            const id = req.params.id;
             const query = { _id: new ObjectId(id) }
             const result = await materialsCollection.deleteOne(query);
             res.send(result)
@@ -259,7 +334,6 @@ async function run() {
         //student notes api
         app.get('/notes/:email', async (req, res) => {
             const query = req.params?.email;
-            console.log(query)
             const result = await notesCollection.find({ email: query }).toArray();
             res.send(result)
         })
@@ -286,8 +360,7 @@ async function run() {
         })
 
         app.delete('/notes/:id', async (req, res) => {
-            const id = req.params.id;
-            console.log(id);
+            const id = req.params?.id;
             const query = { _id: new ObjectId(id) }
             const result = await notesCollection.deleteOne(query);
             res.send(result)
@@ -309,7 +382,13 @@ async function run() {
             })
         })
 
-        // booked api
+        // booked related api
+        app.get('/booked/:email', async (req, res) => {
+            const query = req.params?.email;
+            const result = await bookedCollection.find({ studentEmail: query }).toArray();
+            res.send(result)
+        })
+
         app.post('/book-session', async (req, res) => {
             const booked = req.body;
             const result = await bookedCollection.insertOne(booked)
